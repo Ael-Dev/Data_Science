@@ -1,0 +1,546 @@
+---
+title: "ANÁLISIS DE ASOCIACIÓN"
+author: "CARLOS ALEX NINA GUARDAPUCLLA"
+date: "2023-01-29"
+output: html_document
+---
+
+
+<b style = 'color : DarkGoldenRod; font-size: 25px;'> **ANÁLISIS DE ASOCIACIÓN**</b>
+
+<b style = 'color : DarkRed; font-size: 25px;'> **Tabla de contenido**</b>
+
+
+1. IMPORTACIÓN DE BIBLIOTECAS
+
+2. CARGA DE DATOS
+
+3. CREAR TRANSACCIONES
+
+4. 
+  
+. CONCLUSIONES
+
+<b style = 'color : green; font-size: 25px;'> **1. IMPORTACIÓN DE BIBLIOTECAS**</b>
+
+
+```{r}
+library(tidyverse)
+library(arules)
+library(arulesViz)
+library(xlsx)
+```
+
+<b style = 'color : green; font-size: 25px;'> **2. CARGA DE DATOS**</b>
+
+
+```{r}
+prueba1 <- read.csv('Prueba_1-DataSet.csv', header = TRUE)
+head(prueba1)
+```
+
+
+```{r}
+retail <- prueba1
+head(retail)
+```
+
+```{r}
+str(retail)
+```
+
+
+```{r}
+#Mediante el uso de la función complete.cases nos quedamos con todas las
+#transacciones con datos completos 
+retail <- retail[complete.cases(retail), ]
+```
+
+
+```{r}
+#Convertimos las variables Description y Country de character a factor
+retail %>% mutate(Description = as.factor(Description))
+retail %>% mutate(Country = as.factor(Country))
+```
+
+
+Creamos dos nuevas variables: Fecha y HoraTrans extrayendo la información de la fecha y de la hora de la transacción de la variable InvoiceDate.
+
+```{r}
+#Creamos una nueva variable llamada Fecha y Tiempo a partir
+#de la variable InvoiceDate
+
+retail$Fecha <- as.Date(retail$InvoiceDate)
+HoraTrans<- format(retail$InvoiceDate,format = "%H:%M")
+```
+
+TRATAMIENTO DE OUTLIERS
+
+```{r}
+# convirtiendo a valores positivos
+retail$Quantity <- abs(retail$Quantity)
+
+qrts <- quantile(retail$Quantity, probs = c(0.25, 0.75), na.rm = TRUE)
+caps <- quantile(retail$Quantity, probs = c(.05, .95), na.rm = TRUE)
+iqr <- qrts[2]-qrts[1]
+h <- 1.5 * iqr
+retail$Quantity[retail$Quantity<qrts[1]-h] <- caps[1]
+retail$Quantity[retail$Quantity>qrts[2]+h] <- caps[2]
+```
+
+```{r}
+qrts <- quantile(retail$UnitPrice, probs = c(0.25, 0.75), na.rm = TRUE)
+caps <- quantile(retail$UnitPrice, probs = c(.05, .95), na.rm = TRUE)
+iqr <- qrts[2]-qrts[1]
+h <- 1.5 * iqr
+retail$UnitPrice[retail$UnitPrice<qrts[1]-h] <- caps[1]
+retail$UnitPrice[retail$UnitPrice>qrts[2]+h] <- caps[2]
+```
+
+# DISCRETIZACION
+
+```{r}
+retaild <- retail%>%mutate(
+  Quantity = discretize(Quantity, breaks = 5, method = "interval"))
+table(retaild$Quantity)
+```
+
+
+```{r}
+retaild_ <- retaild%>%mutate(
+  UnitPrice = discretize(UnitPrice, breaks = 5, method = "interval"))
+table(retaild_$UnitPrice)
+```
+
+
+
+
+Unimos las nuevas variables al conjunto de datos retail y le damos un vistazo utilizando la función glimpse.
+
+
+```{r}
+#*****************************
+#Unimos las variables HoraTrans al conjuto de datos
+retaild_ <- cbind(retaild_,HoraTrans)
+```
+
+```{r}
+#Unimos las variables HoraTrans al conjuto de datos
+retail <- cbind(retail,HoraTrans)
+```
+
+
+```{r}
+#Observar si los datos se encuentran correctamente adaptados
+glimpse(retaild_)
+```
+
+agrupar los datos por cliente "InvoiceNo","Fecha","Quantity" Y "UnitPrice" respecto a "DESCRIPTION"
+
+```{r}
+#ddply(conjunto_de_datos, variables_usadas_para_agrupar, función_que_se_aplicará)
+transacciones <- ddply(retail,c("InvoiceNo","Fecha","Quantity","UnitPrice"),               function(df1)paste(df1$Description,                                            collapse = ","))
+```
+
+
+
+```{r}
+#Quitamos del conjunto de datos las variables InvoiceNo y Fecha
+transacciones$InvoiceNo <- NULL
+transacciones$Fecha <- NULL
+transacciones$Quantity <- NULL
+transacciones$UnitPrice <- NULL
+```
+
+
+```{r}
+#Renombramos el nombre de la columna
+colnames(transacciones) <- c("Productos")
+```
+
+
+```{r}
+#Guardamos el conjunto de datos en formato csv
+write.csv(transacciones,"transacciones.csv", quote = FALSE, row.names = FALSE)
+```
+
+
+```{r}
+#Utilizando la función read.transactions del paquete arules
+#leemos en R las transacciones que se guardaron previamente en formato csv
+tr <- read.transactions('transacciones.csv', format = 'basket', sep=',',rm.duplicates = TRUE)
+```
+
+
+```{r}
+trans <- as(tr,"transactions")
+trans
+```
+
+```{r}
+itemFrequencyPlot(trans, support=.3, topN=10,type="absolute")
+```
+
+
+```{r}
+#Aplicamos el algoritmo apriori teniendo como parámetros
+#soporte mínimo = 0.0002
+#confianza mínima = 0.8
+#tamaño máximo = 10
+rules <- apriori(trans, parameter = list(supp=0.0002, conf=0.8, maxlen=5))
+```
+
+
+```{r}
+#Para ver un resumen de las reglas encontradas
+#utilizamos la función summary
+summary(rules)
+```
+
+```{r}
+#Damos un vistazo de las 10 primeras reglas
+inspect(rules[1:10])
+```
+
+
+# MOSTRAR LAS 10 REGLAS CON EL LIFT MAS ALTO
+
+```{r}
+#inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:10])
+inspect(sort(subset(rules, subset=lift>1), by = "lift")[1:10])
+```
+
+```{r}
+#Mediante la función is.subset, identificamos
+#las reglas que son un subconjuto de reglas más grandes
+rules_set <- which(colSums(is.subset(rules, rules)) > 1)
+```
+
+
+```{r}
+#Quitamos las reglas redundantes
+rules_without_dup <- rules[-rules_set]
+```
+
+```{r}
+#Seleccionamos las 10 primeras reglas ordenadas según su confianza
+top50reglas <- head(reglas.asociacion, n = 50, by = "confidence")
+```
+
+```{r}
+#la opción engine="htmlwidget" sirve para que el gráfico sea interactivo
+plot(top50reglas, method = "graph",  engine = "htmlwidget")
+```
+
+
+
+
+
+
+
+<b style = 'color : green; font-size: 25px;'> **2. OTRA FORMA**</b>
+
+
+```{r}
+# CONVERTIR A TIPO FACTOR
+prueba1$InvoiceNo <- factor(prueba1$InvoiceNo)
+prueba1$StockCode <- factor(prueba1$StockCode)
+prueba1$Description <- factor(prueba1$Description)
+prueba1$InvoiceDate <- as.Date(prueba1$InvoiceDate,format = "%d/%m/%Y %H:%M" )
+prueba1$CustomerID <- factor(prueba1$CustomerID)
+prueba1$Country    <- factor(prueba1$Country)
+```
+
+```{r}
+#Eliminar datos nulos
+prueba1 <- prueba1[!apply(is.na(prueba1), 1, any), ]
+```
+
+
+```{r}
+# convirtiendo cada columna como vectores
+attach(prueba1) 
+```
+
+
+```{r}
+#Dividiendo el Description por CustomerID
+ProdCliente <- split(x=prueba1[,"Description"], f=CustomerID)
+ProdCliente[1:4]
+```
+
+
+```{r}
+# Eliminar duplicados antes de crear la matriz de incidencia
+ProdCliente <- lapply(ProdCliente, unique)
+ProdCliente[1:4]
+```
+
+
+
+<b style = 'color : green; font-size: 25px;'> **3. CREAR TRANSACCIONES**</b>
+
+```{r}
+#Convirtiendo a transacciones
+ProdCliente <- as(ProdCliente,"transactions")
+ProdCliente
+```
+
+```{r}
+summary(ProdCliente)
+```
+
+
+```{r}
+as(ProdCliente, "matrix")[1:3,1:20]
+```
+
+
+```{r}
+inspect(ProdCliente[1:3])
+```
+
+```{r}
+image(ProdCliente)
+```
+
+
+```{r}
+itemFrequencyPlot(ProdCliente,support=.3, topN=20,type="absolute")
+```
+
+
+```{r}
+ggplot(
+  tibble(
+    Support = sort(itemFrequency(ProdCliente, type = "absolute"), decreasing = TRUE),
+    Item = seq_len(ncol(ProdCliente))
+  ), aes(x = Item, y = Support)) + geom_line()
+```
+
+# ITEMSETS(CONJUNTO DE ELEMENTOS FRECUENTES)
+
+```{r}
+# EXTRAER CONJUNTOS DE ARTICULOS FRECUENTES
+its <- apriori(ProdCliente, parameter = list(target = "frequent"))
+```
+```{r}
+its
+```
+
+```{r}
+its <- apriori(ProdCliente, parameter = list(target = "frequent", support=0.03))
+```
+
+# ORDENAR POR SOPORTE
+
+```{r}
+its <- sort(its, by="support")
+inspect(head(its, n=10))
+```
+
+```{r}
+ggplot(tibble(`Itemset size` = factor(size(its))), aes(`Itemset size`)) + geom_bar()
+```
+
+```{r}
+inspect(its[size(its)>2])
+```
+
+
+# REPRESENTACION CONCISA DE CONJUNTOS DE ELEMENTOS
+
+```{r}
+its_max <- its[is.maximal(its)]
+its_max
+```
+
+```{r}
+inspect(head(its_max, by = "support"))
+```
+
+# CONJUNTO DE ELEMENTOS FRECUENTES CERRADOS
+
+
+```{r}
+its_closed <- its[is.closed(its)]
+its_closed
+```
+
+```{r}
+inspect(head(its_closed, by = "support"))
+```
+
+```{r}
+counts <- c(
+  frecuent = length(its),
+  closed = length(its_closed),
+  maximal = length(its_max)
+)
+ggplot(as_tibble(counts, rownames = "Itemsets"),
+       aes(Itemsets, counts)) + geom_bar(stat = "identity")
+```
+
+# REGLAS DE ASOCIACION
+
+
+```{r}
+#Creando las reglas
+reglas <- apriori(ProdCliente, parameter = list(support = .02, confidence = .7))
+```
+
+```{r}
+length(reglas)
+```
+
+
+```{r}
+inspect(head(reglas))
+```
+
+```{r}
+quality(head(reglas))
+```
+
+
+# MOSTRAR LAS 10 REGLAS CON EL LIFT MAS ALTO
+
+```{r}
+#inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:10])
+inspect(sort(subset(reglas, subset=lift>1), by = "lift")[1:10])
+```
+
+# CALCULAR MEDIDAS DE INTERES ADICIONAL
+
+```{r}
+trans = ProdCliente
+interestMeasure(reglas[1:10], measure = c("phi","gini"),
+                trans = trans)
+```
+
+# AGREGAR MEDIDAS A LAS REGLAS
+
+```{r}
+quality(reglas) <- cbind(quality(reglas),
+                        interestMeasure(reglas, measure = c("phi","gini"),
+                                        trans = trans))
+```
+
+Encontrar reglas con puntuacion alta para la correlacion phi
+
+```{r}
+inspect(head(reglas, by = "phi"))
+```
+
+# EXTRAER USANDO PLANTILLAS
+
+```{r}
+type <- grep("Description=", itemLabels(trans), value = TRUE)
+type
+```
+
+
+# VISUALIZACION DE REGLAS DE ASOCIACION
+
+```{r}
+plot(reglas)
+```
+
+
+```{r}
+plot(reglas, control = list(jitter = 0))
+```
+
+
+```{r}
+plot(reglas, shading = "order")
+```
+
+```{r}
+plot(reglas, method = "grouped")
+```
+
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+
+```{r}
+plot(reglas, shading = "lift", control = list(main = "Parametros de reglas", col = rainbow(5)))
+plot(reglas, measure = c("support", "lift"), shading = "confidence", control = list(main= "Parametros de reglas"))
+```
+
+
+```{r}
+plot(head(reglas, by="phi", n = 30), method = "graph")
+```
+
+
+
+https://www.youtube.com/watch?v=wWEiK0R2SKI
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

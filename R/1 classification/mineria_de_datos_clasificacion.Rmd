@@ -1,0 +1,781 @@
+---
+title: "CLASIFICACION"
+author: "CARLOS ALEX NINA GUARDAPUCLLA"
+date: "2023-01-07"
+output: html_document
+---
+
+<b style = 'color : DarkGoldenRod; font-size: 25px;'> **Análisis comparativo de las técnicas de clasificación**</b>
+
+<b style = 'color : DarkRed; font-size: 25px;'> **Tabla de contenido**</b>
+
+
+1. IMPORTACIÓN DE BIBLIOTECAS
+
+2. CARGA DE DATOS
+
+3. LIMPIEZA DE DATOS
+
+4. PREPROCESAMIENTO DE DATOS
+
+5. ESCALAR DATOS.
+
+6. ANÁLISIS DE COMPONENTES PRINCIPALES (PCA)
+
+7. PARTICIONAR EN DATOS DE ENTRENAMIENTO Y PRUEBA.
+
+8. CREAR MODELOS DE CLASIFICACION.
+  - ctree
+  - C45 
+  - SVM 
+  - KNN 
+  - rules 
+  - randomForest 
+  - xgboost 
+  - NeuralNet 
+9. EVALUACION DE LOS MODELOS
+10. PREDICCION Y MATRIZ DE CONFUSION
+11. Conclusion
+12. Extra: otras formas de crear los modelos de clasificacion con otras librerias
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+<b style = 'color : green; font-size: 25px;'> **1. - IMPORTACION DE BIBLIOTECAS**</b>
+
+
+```{r}
+library(tidyverse)
+library(caret)
+library(ggcorrplot)
+library(lattice)
+library(RWeka)
+library(party)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+library(reshape2)
+library(ggthemes)
+library(DataExplorer)
+library(psych) 
+library(ggcorrplot)
+library(FactoMineR)
+library(factoextra)
+```
+
+
+<b style = 'color : green; font-size: 25px;'> **2. - CARGA DE DATOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> *Cargando el conjunto de datos*</b>
+
+```{r}
+dataset_cancer<-read.csv(file="TABLA.csv", header = TRUE, sep = ",")
+```
+
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar contenido del dataset*</b>
+
+```{r}
+# MOSTRAR LAS PRIMERAS FILAS
+dataset_cancer <- as_tibble(dataset_cancer)
+head(dataset_cancer)
+```
+
+```{r}
+# MOSTRAR LAS ULTIMAS FILAS
+tail(dataset_cancer)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- La primera columna corresponde al ID el cual no aporta informacion relevante para los posteriores procesos a realizar*</b>
+
+<b style = 'color : green; font-size: 25px;'> **3. - LIMPIEZA DE DATOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> *Eliminando contenido poco relevante*</b>
+
+```{r}
+# Eliminando columna con id's
+dataset_temp <- dataset_cancer[,-c(1)]
+head(dataset_temp)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que las columnas no tienen un nombre adecuado, por lo tanto se debe proceder a renombrarlas*</b>
+
+
+<b style = 'color : green; font-size: 25px;'> **4. - PREPROCESAMIENTO DE DATOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> *Renombrando las columnas*</b>
+
+```{r}
+dataset_cancer <- dataset_temp
+names(dataset_cancer) <- c("Espesor_grupo_celulas", "Uniformidad_tamanio_celular", "Uniformidad_forma_celular",   "Adhesion_marginal","Tamanio_celula_epitelial","Nucleos_desnudos", "Cromatina_blanda","Nucleolos_normales","Mitosis","Clases")
+rownames(dataset_cancer) <- NULL # resetear los indices
+head(dataset_cancer)
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Identificacion y tratamiento de datos nulos*</b>
+
+```{r}
+# Verificar si existen datos nulos
+colSums(is.na(dataset_cancer))
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que no hay presencia de datos nulos o faltantes*</b>
+
+
+```{r}
+# Mostrar descripcion del dataset
+str(dataset_cancer)
+```
+
+```{r}
+# Mostrar resumen estadistico de las columnas
+summary(dataset_cancer)
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar datos únicos de cada columna*</b>
+
+```{r}
+sapply(dataset_cancer, unique)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que la columna "Nucleos_desnudos" es de tipo caracter y posee caracteres que no corresponde con la mayoria de datos*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Debido a que los datos contenidos en esta columna son enteros reemplazar "?" por su "Vecino más cercano", esto con la finalidad de no concentrar los datos(alterar la distribucion) respecto a un solo valor como lo haria la moda, además esto nos ayudará a no perder datos innecesariamente*</b>
+
+```{r}
+# 1. Cambiar "?" por "NA"
+dataset_cancer$Nucleos_desnudos[dataset_cancer$Nucleos_desnudos=="?"] <- NA
+```
+
+```{r}
+# 2. Cargar de library VIM para obtener función kNN
+library(VIM)
+# 3. Aplicar KNN para imputar datos faltantes respecto a dicha columna
+dataset_cancer <-  kNN(dataset_cancer, variable = c("Nucleos_desnudos"), k = 1)
+# 4. Corregir tipo de dato de la columna "Nucleos_desnudos" 
+dataset_cancer$Nucleos_desnudos<- as.integer(dataset_cancer$Nucleos_desnudos)
+#    Corregir el tipo de dato de la columna "Clases"
+dataset_cancer$Clases<- as.factor(dataset_cancer$Clases)
+dataset_cancer <- dataset_cancer[,-c(11)]
+summary(dataset_cancer)
+```
+
+<b style = 'color : blue; font-size: 12px;'>*- Se observa que dicho caracter fue eliminado y el tipo de dato fue corregido*</b>
+
+```{r}
+unique(dataset_cancer$Nucleos_desnudos)
+```
+
+
+<b style = 'color : orange; font-size: 15px;'> *Visualizando la distribucion de los datos mediante el histograma*</b>
+
+```{r}
+plot_histogram(dataset_cancer,ggtheme = theme_linedraw())
+```
+
+
+<b style = 'color : green; font-size: 25px;'> **5.- ESCALAR LOS DATOS**</b>
+
+<b style = 'color : blue; font-size: 12px;'>*- Se procede a normalizar los datos para trabajar en una misma escala*</b>
+
+```{r}
+# Crear una copia del dataset limpio
+dataset_scale <- dataset_cancer
+```
+
+```{r}
+# Escalar las columnas numéricas
+dataset_scale <- dataset_scale[,1:9]
+dataset_scale <- scale(dataset_scale)
+dataset_scale <- data.frame(dataset_scale)
+# Agregando nuevamente la columna "Clases" al dataset escalado
+dataset_scale <- mutate(dataset_scale, Clases = dataset_cancer$Clases)
+summary(dataset_scale)
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Análisis de correlacion*</b>
+
+
+```{r}
+ggcorrplot(round(cor(dataset_scale[,1:9]), 1), type = "lower", lab = T, show.legend = T,tl.srt=45)
+```
+
+
+<b style = 'color : blue; font-size: 12px;'>*- Todas las variables presentan una correlacion positiva"*</b>
+
+<b style = 'color : blue; font-size: 12px;'>*- Mitosis es una variable que presenta baja correlacion respecto a las demas variables"*</b>
+
+<b style = 'color : blue; font-size: 12px;'>*- Se observa una correlacion positiva alta entre las variables "Uniformidad_forma_celular" y "Uniformidad_tamanio_celular"*</b>
+
+
+<b style = 'color : green; font-size: 25px;'> **6.- ANÁLISIS DE COMPONENTES PRINCIPALES (PCA)**</b>
+
+```{r}
+dataset_scale_PCA.pca <- PCA(dataset_scale[,1:9], graph=FALSE)
+print(dataset_scale_PCA.pca)
+```
+
+```{r}
+fviz_screeplot(dataset_scale_PCA.pca, addlabels = TRUE, ylim = c(0, 75)) +
+  theme_classic()
+```
+
+
+<b style = 'color : blue; font-size: 12px;'>*Se observa que las 2 primeras dimensiones retienen aproximadamente el 74% de las varianzas contenidas en el conjunto de datos.*</b>
+
+
+```{r}
+fviz_pca_var(dataset_scale_PCA.pca, col.var="contrib",
+             repel = TRUE 
+             )+scale_colour_viridis_c() 
+```
+
+
+<b style = 'color : blue; font-size: 12px;'>*Segun el grafico de influencias se observa que la mayoria de las variables que apuntan a la derecha tienen influencias positivas grandes en la dimension 1 y "mitosis" tiene influencia positiva sobre la dimension 2.*</b>
+
+<b style = 'color : blue; font-size: 12px;'>*Segun el grafico se observa que la variable "Mitosis" presenta casi una ortogonalidad respecto a algunas variables *</b>
+
+
+
+<b style = 'color : green; font-size: 25px;'> **7. PARTICIONAR EN DATOS DE ENTRENAMIENTO Y PRUEBA**</b>
+
+
+```{r}
+dataset_scale <- data.frame(dataset_scale)
+inTrain <- createDataPartition(y = dataset_scale$Clases, p = .8, list = FALSE)
+cancer_train <- dataset_scale %>% slice(inTrain)
+cancer_test <- dataset_scale %>% slice(-inTrain)
+```
+
+
+- Crear un esquema de muestreo fijo (10 folds)
+
+```{r}
+train_index <- createFolds(cancer_train$Clases, k = 10)
+```
+
+
+<b style = 'color : green; font-size: 25px;'> **8. CREAR MODELOS DE CLASIFICACION**</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Árbol de inferencia condicional (Árbol de decisión)*</b>
+
+```{r}
+# Haciendo usop de la libreria rpart
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+tree_decision <- rpart(Clases ~ ., data = cancer_train, method = "class")
+rpart.plot(tree_decision)
+```
+
+
+```{r}
+# otra forma de crear el arbol de decision
+ctreeFit <- cancer_train %>% train(Clases ~ .,
+            method = "ctree",
+            data = .,
+            tuneLength = 5,
+            trControl = trainControl(method = "cv", indexOut = train_index))
+ctreeFit
+```
+
+<b style = 'color : blue; font-size: 12px;'>*Los resultados muestran que el modelo tiene un 97% de accuracy y kappa de 93% lo cual indica que es un buen modelo con un mincriterion <= 0.745 *</b>
+
+
+```{r}
+plot(ctreeFit$finalModel)
+```
+
+```{r}
+ctreeFit$finalModel
+```
+<b style = 'color : blue; font-size: 12px;'>*Se observa que el modelo considera la variable "Uniformidad_tamanio_celular " como nodo padre, seguido esta la variable "Nucleos_desnudos", teniendo una concentracion de 323 en el nodo 4*</b>
+
+<b style = 'color : blue; font-size: 12px;'>*Además se observa que hay presencia de nodos que presentan alto grado de impureza*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *C4.5 Decision Tree *</b>
+
+
+```{r}
+library(RWeka)
+C45Fit <- cancer_train %>% train(Clases ~ .,
+            method = "J48",
+            data = .,
+            tuneLength = 5,
+            trControl = trainControl(method = "cv", indexOut = train_index))
+C45Fit
+```
+```{r}
+C45Fit$finalModel
+```
+
+<b style = 'color : blue; font-size: 12px;'>*El modelo eligio al atributo "Uniformidad_tamanio_celular", el cual es la primera variable que divide eficazmente al conjunto de datos en otros subconjuntos *</b>
+
+<b style = 'color : blue; font-size: 12px;'>*Con este modelo se obtuvo un accuracy aproximadamente de 97% e indice kappa de 94%, el cual indica que es mejor que el modelo creado anteriormente *</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Clasificador K-Nearest Neighbors*</b>
+
+```{r}
+knnFit <- cancer_train %>% train(Clases ~ .,
+            method = "knn",
+            data = .,
+            preProcess = "scale",
+            tuneLength = 5,
+            tuneGrid=data.frame(k = 1:10),
+            trControl = trainControl(method = "cv", indexOut = train_index))
+knnFit
+```
+
+```{r}
+knnFit$finalModel
+```
+
+
+<b style = 'color : blue; font-size: 12px;'>*El modelo de KNN obtuvo mejores resultados con 1 solo vecino mas cercano, obteniendo un accuracy de 99.82% y kappa de 99.59% el cual indica que es un buen modelo y posee una alta concoordancia*</b>
+
+<b style = 'color : orange; font-size: 15px;'> *PART (Rule-based classifier)*</b>
+
+```{r}
+rulesFit <- cancer_train %>% train(Clases ~ .,
+            method = "PART",
+            data = .,
+            tuneLength = 5,
+            trControl = trainControl(method = "cv", indexOut = train_index))
+rulesFit
+```
+
+```{r}
+rulesFit$finalModel
+```
+
+<b style = 'color : blue; font-size: 12px;'>*El modelo de basado en reglas construyo un total de 9 reglas, logranto obtener un accuracy 99.11%,donde para obtener este valor se aplico poda y un umbral de 0.1325*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Linear Support Vector Machines*</b>
+
+```{r}
+svmFit <- cancer_train %>% train(Clases ~ .,
+            method = "svmLinear",
+            data = .,
+            tuneLength = 5,
+            trControl = trainControl(method = "cv", indexOut = train_index))
+svmFit
+```
+```{r}
+svmFit$finalModel
+```
+
+<b style = 'color : blue; font-size: 12px;'>*El modelo "svmLinear" obtuvo un accuracy de 0.9658732 y kappa de 0.9250876, debido a que esta realizando una division lineal, lo que conlleva a que haya datos de la otra clase al otro lado del hiperplano y viceversa*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Random Forest*</b>
+
+```{r}
+randomForestFit <- cancer_train %>% train(Clases ~ .,
+            method = "rf",
+            data = .,
+            tuneLength = 5,
+            trControl = trainControl(method = "cv", indexOut = train_index))
+randomForestFit
+```
+
+```{r}
+randomForestFit$finalModel
+```
+
+
+<b style = 'color : blue; font-size: 12px;'>*El modelo "Random forest" obtuvo un accuracy de 100%  y kappa de 100%, con número de variables probadas en cada división = 2, ya que este modelo combina multiples arbnoles de decisión, por lo que se puede decir es un buen modelo, sin embargo podriamos estar frente a un caso de overfitting*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Gradient Boosted Decision Trees (xgboost)*</b>
+
+
+```{r}
+xgboostFit <- cancer_train %>% train(Clases ~ .,
+              method = "xgbTree",
+              data = .,
+              tuneLength = 5,
+              trControl = trainControl(method = "cv", indexOut = train_index),
+              tuneGrid = expand.grid(
+                          nrounds = 20,
+                          max_depth = 3,
+                          colsample_bytree = .6,
+                          eta = 0.1,
+                          gamma=0,
+                          min_child_weight = 1,
+                          subsample = .5
+                          )
+              )
+xgboostFit
+```
+```{r}
+xgboostFit$finalModel
+```
+
+<b style = 'color : blue; font-size: 12px;'>*El modelo "xgbTree" obtuvo un accuracy de 0.9694771 y kappa de 0.93342, con los valores de tunning como se muestran en la tabla de resumen.*</b>
+
+
+
+<b style = 'color : orange; font-size: 15px;'> *Artificial Neural Network*</b>
+
+```{r}
+nnetFit <- cancer_train %>% train(Clases ~ .,
+          method = "nnet",
+          data = .,
+          tuneLength = 5,
+          trControl = trainControl(method = "cv", indexOut = train_index),
+          trace = FALSE)
+nnetFit
+```
+
+```{r}
+nnetFit$finalModel
+```
+
+
+<b style = 'color : blue; font-size: 12px;'>*El modelo "ANN" obtuvo un accuracy de 0.9910378 y kappa de 0.9801810, para una decadencia de 0.001 y tamaño = 7, lo cual indica que es un buen modelo y posee una alta concoordancia*</b>
+
+
+<b style = 'color : green; font-size: 25px;'> **9.- EVALUACION Y COMPARACION DE LOS MODELOS**</b>
+
+<b style = 'color : blue; font-size: 12px;'>*A continuacion se procede a realizar la comparacion del desempeño entre los diferentes modelos creados*</b>
+
+```{r}
+resamps <- resamples(list(
+          ctree = ctreeFit,
+          C45 = C45Fit,
+          SVM = svmFit,
+          KNN = knnFit,
+          rules = rulesFit,
+          randomForest = randomForestFit,
+          xgboost = xgboostFit,
+          NeuralNet = nnetFit
+          ))
+resamps
+```
+```{r}
+summary(resamps)
+```
+
+<b style = 'color : blue; font-size: 12px;'>*Los modelos con mejor desempeño respecto al minimo estan encabezados por "randomForest" con accuracy de 100% seguido de KNN con 98.21% y "NeuralNet" con 98.18% *</b>
+
+
+```{r}
+library(lattice)
+bwplot(resamps, layout = c(3, 1))
+```
+
+<b style = 'color : blue; font-size: 12px;'>*Con el diagrama de boxplot vertical se corrobora lo antes mencionado, donde RandomForest tiene el mejor desempeño respecto a los demás.*</b>
+
+```{r}
+difs <- diff(resamps)
+difs
+```
+
+```{r}
+summary(difs)
+```
+
+<b style = 'color : blue; font-size: 12px;'>*Todos los modelos creados funcionan de forma semejante, donde p value > 0.05, por lo que la hipotesis nula es cierta.*</b>
+
+
+```{r}
+library(keras)
+```
+```{r}
+X_ <- cancer_train %>% select(!Clases) %>%
+mutate(across(everything(), as.integer)) %>% as.matrix()
+head(X_)
+```
+
+```{r}
+y <- cancer_train %>% pull("Clases") %>% as.integer() %>% `-`(1L) %>% to_categorical()
+```
+
+```{r}
+y <- cancer_train %>% pull("Clases") %>% as.integer() %>% `-`(1L) %>% to_categorical()
+head(y)
+```
+
+
+```{r}
+model <- keras_model_sequential() %>%
+      layer_dense(units = 10, activation = 'relu', input_shape = c(ncol(X)),
+      kernel_regularizer=regularizer_l2(l=0.01)) %>%
+      layer_dense(units = ncol(y), activation = 'softmax') %>%
+      compile(loss = 'categorical_crossentropy', optimizer = 'adam', metrics = 'accuracy')
+```
+
+```{r}
+data(Zoo, package="mlbench")
+Zoo <- as_tibble(Zoo)
+Zoo
+```
+
+
+
+<b style = 'color : green; font-size: 25px;'> **10. PREDICCION Y MATRIZ DE CONFUSION**</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Random forest*</b>
+
+```{r}
+rf_pred <- predict(randomForestFit, cancer_test)
+rf_pred
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Matriz de confusion*</b>
+
+```{r}
+confusionMatrix(rf_pred,factor(cancer_test$Clases))
+```
+
+<b style = 'color : orange; font-size: 15px;'> *KNN*</b>
+
+```{r}
+knn_pred <- predict(knnFit, cancer_test)
+knn_pred
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Matriz de confusion*</b>
+
+```{r}
+confusionMatrix(knn_pred,factor(cancer_test$Clases))
+```
+
+<b style = 'color : orange; font-size: 15px;'> *ANN*</b>
+
+```{r}
+nnet_pred <- predict(nnetFit, cancer_test)
+nnet_pred
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Matriz de confusion*</b>
+
+```{r}
+confusionMatrix(nnet_pred,factor(cancer_test$Clases))
+```
+
+<b style = 'color : blue; font-size: 12px;'>*Se ha realizado las predicciones con los 3 mejores modelos encontrados anteriormente, donde random forest obtuvo como "Balanced Accuracy" un 96.33%, con una sensitividad de 0.989 y especificidad 0.9375, teniendo asi un mejor desempeño respecto a KNN con un "Balanced Accuracy" de 95.28% y neural network con 92.16%. *</b>
+
+
+<b style = 'color : green; font-size: 25px;'> **11. CONCLUSION**</b>
+
+<b style = 'color : blue; font-size: 12px;'>*- Como primera conclusion la etapa de la limpieza tiene vital importancia para el entrenamiento de los modelos, ya que sino se realiza de forma adecuada, este puede llevarnos a resultados erroneos o ficticios.*</b>
+
+<b style = 'color : blue; font-size: 12px;'>*- Para evitar perdida de informacion cuando hay presencia de  datos inconsistentes o nulos en alguna columna, se sugiere aplicar tecnicas como reemplazar por su vecino mas cercano, la moda, la media, etc. dependiendo del tipo de dato de la columna y/o distribucion de dichos datos.*</b>
+
+<b style = 'color : blue; font-size: 12px;'>*- El modelo de Random forest obtuvo el mejor desempeño tanto en el entrenamiento como en la prediccion respecto a los demas, debido a que funciona en base a la creacion de varios arboles de decision, donde cada arbol da una clasificacion(vota por una clase) y el resultado es la clase con mayor voto en todo el bosque.*</b>
+
+
+
+<b style = 'color : green; font-size: 25px;'> **EXTRA: CREANDO MODELOS CON OTRAS LIBRERIAS Y GRAFICANDO RESULTADOS**</b>
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(caret)
+
+decisionplot <- function(model, data, class_var,
+  predict_type = c("class", "prob"), resolution = 5 * 75) {
+  
+      # resolution is set to 75 dpi if the image is rendered 5 inces wide.
+      y <- data %>% pull(class_var)
+      x <- data %>% dplyr::select(-all_of(class_var))
+      
+      # resubstitution accuracy
+      prediction <- predict(model, x, type = predict_type[1])
+      
+      # LDA returns a list
+      if(is.list(prediction)) prediction <- prediction$class
+      prediction <- factor(prediction, levels = levels(y))
+      cm <- confusionMatrix(data = prediction, reference = y)
+      acc <- cm$overall["Accuracy"]
+      
+      # evaluate model on a grid
+      r <- sapply(x[, 1:2], range, na.rm = TRUE)
+      xs <- seq(r[1,1], r[2,1], length.out = resolution)
+      ys <- seq(r[1,2], r[2,2], length.out = resolution)
+      g <- cbind(rep(xs, each = resolution), rep(ys, time = resolution))
+      colnames(g) <- colnames(r)
+      g <- as_tibble(g)
+      
+      ### guess how to get class labels from predict
+      ### (unfortunately not very consistent between models)
+      cl <- predict(model, g, type = predict_type[1])
+      
+      # LDA returns a list
+      if(is.list(cl)) {
+      prob <- cl$posterior
+      cl <- cl$class
+      } else
+      try(prob <- predict(model, g, type = predict_type[2]))
+      
+      # we visualize the difference in probability/score between the
+      # winning class and the second best class.
+      # don't use probability if predict for the classifier does not support it.
+      max_prob <- 1
+      try({
+      max_prob <- t(apply(prob, MARGIN = 1, sort, decreasing = TRUE))
+      max_prob <- max_prob[,1] - max_prob[,2]
+      }, silent = TRUE)
+      cl <- factor(cl, levels = levels(y))
+      g <- g %>% add_column(prediction = cl, probability = max_prob)
+      ggplot(g, mapping = aes_string(
+      x = colnames(g)[1],
+      y = colnames(g)[2])) +
+        geom_raster(mapping = aes(fill = prediction, alpha = probability)) +
+      geom_contour(mapping = aes(z = as.numeric(prediction)),
+      bins = length(levels(cl)), size = .5, color = "black") +
+      geom_point(data = data, mapping = aes_string(
+      x = colnames(data)[1],
+      y = colnames(data)[2],
+      shape = class_var), alpha = .7) +
+      scale_alpha_continuous(range = c(0,1), limits = c(0,1), guide = "none") +
+      labs(subtitle = paste("Training accuracy:", round(acc, 2)))
+  }
+```
+
+
+```{r}
+dataset_cancer <- as_tibble(dataset_cancer)
+x <- dataset_cancer %>% dplyr::select(Espesor_grupo_celulas, Uniformiformidad_tamanio_celular, Clases)
+x$Clases<- as.factor(x$Clases)
+```
+
+
+```{r}
+ggplot() + geom_point(data = dataset_cancer, aes(Espesor_grupo_celulas, Uniformiformidad_tamanio_celular, color = Clases), size = 0.9)
+```
+
+
+<b style = 'color : orange; font-size: 15px;'> *Clasificador K-Nearest Neighbors*</b>
+
+
+```{r}
+library(caret)
+model <- x %>% knn3(Clases ~ ., data = ., k = 1)
+decisionplot(model, x, class_var = "Clases") + labs(title = "kNN (1 neighbor)")
+```
+
+```{r}
+model <- x %>% knn3(Clases ~ ., data = ., k = 6)
+decisionplot(model, x, class_var = "Clases") + labs(title = "kNN (1 neighbor)")
+```
+
+
+
+```{r}
+model <- x %>% knn3(Clases ~ ., data = ., k = 10)
+decisionplot(model, x, class_var = "Clases") + labs(title = "kNN (1 neighbor)")
+```
+
+
+```{r}
+library(e1071)
+model <- x %>% naiveBayes(Clases ~ ., data = .)
+decisionplot(model, x, class_var = "Clases", predict_type = c("class", "raw")) + labs(title
+= "Naive Bayes")
+```
+
+
+```{r}
+library(MASS)
+```
+
+```{r}
+model <- x %>% lda(Clases ~ ., data = .)
+decisionplot(model, x, class_var = "Clases") + labs(title = "LDA")
+```
+
+```{r}
+library(nnet)
+model <- x %>% multinom(Clases ~., data = .)
+decisionplot(model, x, class_var = "Clases") + labs(titel = "Multinomial Logistic Regressio
+n")
+```
+
+```{r}
+library("rpart")
+model <- x %>% rpart(Clases ~ ., data = .)
+decisionplot(model, x, class_var = "Clases") + labs(title = "CART")
+```
+
+
+```{r}
+library(C50)
+model <- x %>% C5.0(Clases ~ ., data = .)
+decisionplot(model, x, class_var = "Clases") + labs(title = "C5.0")
+```
+
+```{r}
+library(randomForest)
+model <- x %>% randomForest(Clases ~ ., data = .)
+decisionplot(model, x, class_var = "Clases") + labs(title = "Random Forest")
+```
+
+```{r}
+library(e1071)
+model <- x %>% svm(Clases ~ ., data = ., kernel = "linear")
+decisionplot(model, x, class_var = "Clases") + labs(title = "SVM (linear kernel)")
+```
+
+```{r}
+model <- x %>% svm(Clases ~ ., data = ., kernel = "radial")
+decisionplot(model, x, class_var = "Clases") + labs(title = "SVM (radial kernel)")
+```
+
+```{r}
+model <- x %>% svm(Clases ~ ., data = ., kernel = "polynomial")
+decisionplot(model, x, class_var = "Clases") + labs(title = "SVM (polynomial kernel)")
+```
+
+```{r}
+model <- x %>% svm(Clases ~ ., data = ., kernel = "sigmoid")
+decisionplot(model, x, class_var = "Clases") + labs(title = "SVM (sigmoid kernel)")
+```
+
+
+```{r}
+library(nnet)
+model <-x %>% nnet(Clases ~ ., data = ., size = 1, maxit = 1000, trace = FALSE)
+decisionplot(model, x, class_var = "Clases",
+predict_type = c("class", "raw")) + labs(title = "NN (1 neuron)")
+```
+
+
+```{r}
+model <-x %>% nnet(Clases ~ ., data = ., size = 15, maxit = 1000, trace = FALSE)
+decisionplot(model, x, class_var = "Clases",
+predict_type = c("class", "raw")) + labs(title = "NN (4 neurons)")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

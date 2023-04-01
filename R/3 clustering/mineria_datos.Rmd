@@ -1,0 +1,502 @@
+---
+title: "TRABAJO REGLAS DE ASOCIACION"
+author: "CARLOS ALEX NINA GUARDAPUCLLA"
+date: "2023-01-22"
+output: html_document
+---
+
+
+
+<b style = 'color : DarkGoldenRod; font-size: 25px;'> **Algoritmos de minería de conjuntos de elementos frecuentes**</b>
+
+<b style = 'color : DarkRed; font-size: 25px;'> **Tabla de contenido**</b>
+
+
+1. IMPORTACIÓN DE BIBLIOTECAS
+
+2. CARGA DE DATOS
+
+  - 2.1. IRIS
+  - 2.2. ADULT
+  - 2.3. GROCERIES
+
+3. IMPLEMENTACION DE ALGORITMOS
+
+  - 3.1. APRIORI
+  - 3.2. ECLAT
+  - 3.3. FP-GROWTH
+  
+4. CONCLUSIONES
+
+<b style = 'color : green; font-size: 25px;'> **1. IMPORTACIÓN DE BIBLIOTECAS**</b>
+
+
+```{r}
+library(tidyverse)
+library(caret)
+library(RWeka)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+library(arules)
+library(arulesViz)
+library(rCBA)
+```
+
+<b style = 'color : green; font-size: 25px;'> **2. CARGA DE DATOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> **DATASET IRIS**</b>
+
+```{r}
+data("iris")
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Informacion sobre el dataset*</b>
+
+```{r}
+summary(iris)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *Convirtiendo el dataset a objeto de tipo transaccion*</b>
+```{r}
+train <- sapply(iris,as.factor)
+train <- data.frame(train, check.names=FALSE)
+```
+
+```{r}
+iris = as(data.frame(lapply(iris, as.character),stringsAsFactors=T), "transactions")
+```
+
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando la frecuencia de items*</b>
+
+```{r}
+itemFrequencyPlot(iris, topN=10,type="absolute")
+```
+
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que la caracteristica de especies se encuentra equitativamente distribuidas*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Frecuencia de items*</b>
+
+```{r}
+frecuencia_items <- itemFrequency(x = iris, type = "absolute")
+frecuencia_items %>% sort(decreasing = TRUE) %>% head(5)
+```
+
+
+<b style = 'color : green; font-size: 25px;'> **3. IMPLEMENTACION DE ALGORITMOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. APRIORI*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- Creando el modelo de reglas con un soporte de 3% y una confianza de 70% *</b>
+
+```{r}
+reglas <- apriori(data = iris, parameter = list(support = 0.03, confidence = 0.7, target = "rules"))
+```
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base a la confianza más alta*</b>
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence"))
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- El algoritmo ha encontrado 46 reglas que superan el soporte y la confianza establecida, donde hay reglas estan formadas por uno o dos items*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- En la tabla se observa que las reglas con soporte de 0.03 y 0.04 tienen una alta confianza de 1*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support", decreasing = TRUE)[1:10]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que 29 items, el cual posee el soporte mas alto con 0.1933 y una confianza de 1*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa los grafos formados por las 46 reglas, y aquellos nodos correspondientes a las reglas (38 y 41) de color rojo, son los que poseen un lift mas alto, en este caso de 8*</b>
+
+
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. ECLAT*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- Creando el modelo de reglas con un soporte de 3% y una confianza de 70% *</b>
+
+```{r}
+
+itemsets <- eclat(iris, parameter = list(supp = 0.03, maxlen = 5))
+itemsets
+
+reglas <- ruleInduction(itemsets, confidence = 0.7)
+reglas
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+inspect(sort(reglas, by = "confidence")[1:30])
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support")[1:30]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que se han encontrado 114 itemsets, generandose 46 reglas, en el cual el soporte mas alto es de 0.1933 y una confianza de 1*</b>
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa los grafos formados por las 46 reglas, y aquellos nodos correspondientes a las reglas (25 y 30) de color rojo, son los que poseen un lift mas alto, en este caso de mayores a 8*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. FP-GROWTH*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- Creando el modelo de reglas con un soporte de 3% y una confianza de 70% *</b>
+
+```{r}
+reglas = rCBA::fpgrowth(iris, support=0.03, confidence=0.7, maxLength=2, consequent="Species",
+            parallel=FALSE)
+summary(reglas)
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base a la confianza más alta*</b>
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:30])
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support")[1:30]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que se han 33 reglas que superan los parametros establecidos, donde el soporte mas alto obtenido es de 0.1933 y una confianza de 1*</b>
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa los grafos formados por las 33 reglas, y aquellos nodos de color rojo, son los que poseen un lift mas alto, en este caso 3*</b>
+
+
+```{r}
+# filtrar reglas con una confianza superior a 0.4 o al 40%
+subRules<-reglas[quality(reglas)$confidence>0.4]
+plot(subRules)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- La tabla muestra las reglas que superaron el 40% de confianza y la intensidad del color indica que tan alto es el valor de la probabilidad de ocurrencia(lift)*</b>
+
+
+<b style = 'color : green; font-size: 25px;'> **4. CONCLUSION**</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- Los 3 algoritmos tuvieron un desempeño similar, sin embargo Eclat mostro mas reglas con 1 de confianza, sin embargo esta metrica no es del todo confiable, se recomienda corroborar con las demas metricas.*</b>
+
+
+<b style = 'color : green; font-size: 25px;'> **2. CARGA DE DATOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> **DATASET ADULT**</b>
+
+```{r}
+data("Adult")
+```
+
+
+<b style = 'color : orange; font-size: 15px;'> *Informacion sobre el dataset*</b>
+
+```{r}
+summary(Adult)
+```
+
+
+<b style = 'color : orange; font-size: 15px;'> *Grafica de la frecuencia de items*</b>
+
+```{r}
+itemFrequencyPlot(Adult, topN=10,type="absolute")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Segun la grafica se observa las 10 caracteristicas mas frecuentes*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Frecuencia de items*</b>
+
+```{r}
+frecuencia_items <- itemFrequency(x = Adult, type = "absolute")
+frecuencia_items %>% sort(decreasing = TRUE) %>% head(5)
+```
+
+
+
+<b style = 'color : green; font-size: 25px;'> **3. IMPLEMENTACION DE ALGORITMOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. APRIORI*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- Creando el modelo de reglas con un soporte de 4% y una confianza de 50% *</b>
+
+```{r}
+reglas <- apriori(data = Adult, parameter = list(support = 0.04, confidence = 0.5, target = "rules"))
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base a la confianza más alta*</b>
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:30])
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- El algoritmo ha encontrado 45796 reglas que superan el soporte y la confianza establecida, donde hay reglas estan formadas por por mas de 1 item*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- En la tabla se observa que las reglas con soporte de 0.04 tienen una alta confianza de 1*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support", decreasing = TRUE)[1:10]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que 29 items, el cual posee el soporte mas alto con 0.95 y una confianza de 0.95*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa el grafo formado por las 45796 reglas, y aquellos nodos correspondientes a las reglas (1,2,3,4) de color rojo, son los que poseen un lift mas alto, en este caso superior a 19, lo que significa que hay 19 veces mas posibilidades de que suceda dicho evento*</b>
+
+
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. ECLAT*</b>
+
+
+```{r}
+
+itemsets <- eclat(Adult, parameter = list(supp = 0.04, maxlen = 5))
+itemsets
+
+reglas <- ruleInduction(itemsets, confidence = 0.5)
+reglas
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base a la confianza más alta*</b>
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:30])
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- El algoritmo ha encontrado 23380 reglas que superan el soporte y la confianza establecida, donde hay reglas estan formadas por mas de 1 item*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- En la tabla se observa que las reglas con soporte de 0.04 tienen una alta confianza de 1*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support", decreasing = TRUE)[1:20]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que hay reglas que poseen un soporte mayor a 0.8, con una confianza superior a 0.8, y un lift de 0.99, lo cual nos indica que la confianza por si sola no es una metrica para tomar una decision, siempre debe ir acompañada de la evaluacion de otras metricas*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa el grafo formado por las 23380 reglas, y aquellos nodos correspondientes a las reglas (1,2,3,4) de color rojo, son los que poseen un lift mas alto, en este caso superior a 19, lo que significa que hay 19 veces mas posibilidades de que suceda dicho evento*</b>
+
+
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. FP-GROWTH*</b>
+
+
+```{r}
+reglas = rCBA::fpgrowth(Adult, support=0.04, confidence=0.5, maxLength=2, consequent="capital-loss",
+            parallel=FALSE)
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base a la confianza más alta*</b>
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:20])
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- El algoritmo ha encontrado 41 reglas que superan el soporte y confianza establecida respecto a la caracteristica "capital-loss"*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- En la tabla se observa que las reglas con soporte de 0.04 y 0.09 que tienen una alta confianza de 1 aproximadamente*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support", decreasing = TRUE)[1:20]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que hay reglas que poseen un soporte mayor a 0.8, con una confianza superior a 0.9, y un lift de 0.99*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa el grafo formado por las 41 reglas, y aquellos nodos de color rojo, son los que poseen un lift mas alto, en este caso superior a 1, son los eventos que tienen mas probabilidades de suceder*</b>
+
+
+```{r}
+subRules<-reglas[quality(reglas)$confidence>0.4]
+plot(subRules)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que solo hay 1 valor que logro alcanzar la confianza de 1, tambien se observa que hay algunas reglas con un soporte considerablemente bueno y una confianza buena*</b>
+
+<b style = 'color : green; font-size: 25px;'> **4. CONCLUSION**</b>
+
+<b style = 'color : blue; font-size: 13px;'> *Para esta situacion el algoritmo APRIORI fue quien tuvo mejor desempeño respecto a los demas*</b>
+
+
+
+<b style = 'color : orange; font-size: 15px;'> **DATASET GROCERIES**</b>
+
+```{r}
+data("Groceries")
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Informacion y tamaño de los datos*</b>
+
+```{r}
+summary(Groceries)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *Se observa el dataset cuenta con 9835 registros y 169 columnas*</b>
+
+<b style = 'color : orange; font-size: 15px;'> *Grafica de la frecuencia de items*</b>
+
+```{r}
+itemFrequencyPlot(Groceries, topN=10,type="absolute")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *Se observa las 10 caracteristicas(items) mas frecuentes*</b>
+
+
+<b style = 'color : green; font-size: 25px;'> **3. IMPLEMENTACION DE ALGORITMOS**</b>
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. APRIORI*</b>
+
+```{r}
+reglas <- apriori(data = Groceries, parameter = list(support = 0.01, confidence = 0.5, target = "rules"))
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base a la confianza más alta*</b>
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:10])
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- El algoritmo ha encontrado 15 reglas que superan el soporte y confianza establecida"*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- En la tabla se observa que las reglas con soporte de 0.01 que tienen una confianza por encima del 50%*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support", decreasing = TRUE)[1:10]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que la mayoria de reglas poseen un soporte por encima de 0.01, con una confianza superior a 0.5, y un lift superior a 2*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa el grafo formado por las 15 reglas, y aquellos nodos de color rojo, son los que poseen un lift mas alto, en este caso superior a 3, son los eventos que tienen mas probabilidades de suceder*</b>
+
+
+
+
+<b style = 'color : orange; font-size: 15px;'> *3.1. ECLAT*</b>
+
+
+```{r}
+
+itemsets <- eclat(Groceries, parameter = list(supp = 0.01, maxlen = 5))
+itemsets
+
+reglas <- ruleInduction(itemsets, confidence = 0.5)
+reglas
+```
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base a la confianza más alta*</b>
+
+```{r}
+inspect(sort(x = reglas, decreasing = TRUE, by = "confidence")[1:10])
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- El algoritmo ha encontrado 15 reglas que superan el soporte y confianza establecida"*</b>
+
+<b style = 'color : blue; font-size: 13px;'> *- En la tabla se observa que las reglas con soporte de 0.01 que tienen una confianza por encima del 50%*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Mostrar la tabla de reglas en base al soporte más alto*</b>
+
+```{r}
+top_10_itemsets <- sort(reglas, by = "support", decreasing = TRUE)[1:10]
+inspect(top_10_itemsets)
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa que la mayoria de reglas poseen un soporte por encima de 0.01, con una confianza superior a 0.5, y un lift superior a 2*</b>
+
+
+<b style = 'color : orange; font-size: 15px;'> *Graficando las reglas*</b>
+
+```{r}
+plot(reglas, method = "Graph", engine = "htmlwidget")
+```
+
+<b style = 'color : blue; font-size: 13px;'> *- Se observa el grafo formado por las 15 reglas, y aquellos nodos de color rojo son los que poseen un lift mas alto, en este caso superior a 3*</b>
+
+
+
+```{r}
+# Filter rules with confidence greater than 0.4 or 40%
+subRules<-reglas[quality(reglas)$confidence>0.4]
+plot(subRules)
+```
+
+
+
+<b style = 'color : green; font-size: 25px;'> **4. CONCLUSION**</b>
+
+
+<b style = 'color : blue; font-size: 13px;'> *- Se concluye que el algoritmo Apriori y Eclat tuvieron un desempeño similar para todos los casos y metricas evaluadas, sin embargo no hay que confiar solo en 1 metrica considerar varias para corroborar los resultados y tomar una decision adecuada*</b>
+
+
