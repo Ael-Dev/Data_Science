@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ---
 title: "CLASIFICACION"
 author: "CARLOS ALEX NINA GUARDAPUCLLA"
@@ -830,3 +831,837 @@ ref = testing_reptile$type, positive = "reptile")
 
 
 
+=======
+---
+title: "CLASIFICACION"
+author: "CARLOS ALEX NINA GUARDAPUCLLA"
+date: "2022-12-15"
+output: html_document
+---
+
+# 1. Clasificacion
+
+## 1.1. El conjunto de datos Zoo
+
+
+- Importando libreria
+```{r}
+library(tidyverse)
+```
+
+- Haciendo uso del conjunto de datos Zoo
+```{r}
+data(Zoo, package = "mlbench")
+```
+
+```{r}
+head(Zoo)
+```
+
+```{r}
+as_tibble(Zoo, rownames="animal")
+```
+
+- Eliminar la columna de animales
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+
+Dicha columna sera eliminado, debido a que no es un atributo relevante y comun para clasificar especies de animales
+```{r}
+Zoo <- Zoo %>%
+  modify_if(is.logical, factor, levels = c(TRUE, FALSE))  %>%
+  modify_if(is.character, factor)
+
+summary(Zoo)
+```
+
+
+
+#1.2. ARBOLES DE DECISION
+- particion recursiva
+```{r}
+library(rpart)
+```
+
+#1.2.  Crear un árbol con la configuración predeterminada (utiliza la poda previa)
+```{r}
+tree_default <- Zoo %>% rpart(type ~ ., data = .)
+tree_default
+```
+
+- La variable de clase necesita un factor (nominal) o rpart creará un árbol de regresión en lugar de un árbol de decisión.  
+
+### Graficando
+```{r}
+library(rpart.plot)
+rpart.plot(tree_default, extra = 2)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+
+Los resultados muestran que el modelo realizo la clasificacion en 5 especies diferentes, sin embargo indica que la clase de los insectos y anfibios no estan siendo usados.
+
+
+# 1.2.2. - Crear un árbol completo
+
+```{r}
+tree_full <- Zoo %>% rpart(type ~., data = ., control = rpart.control(minsplit = 2, cp = 0))
+rpart.plot(tree_full, extra = 2, roundint=FALSE,
+box.palette = list("Gy", "Gn", "Bu", "Bn", "Or", "Rd", "Pu")) # specify 7 colors
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+
+Los resultados muestran que el modelo realizo la clasificacion en 7 especies diferentes, sin embargo indica que la clase de los insectos se encuentran dentro de la clase de los moluscos.
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE AGREGA ** </b>
+
+
+- minsplit: el número mínimo de observaciones que deben existir en un nodo para que se intente una división.
+
+- cp: parámetro de complejidad, la función principal de este parámetro es ahorrar tiempo de cálculo eliminando divisiones que no valen la pena. 
+
+
+```{r}
+tree_full
+```
+
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+Indica que la caracteristica determinante para clasificar a una especie como mamifero es 'mammal',
+para clasificar como ave es 'feathers', para clasificar en peces es 'fins', sin embargo segun el modelo los insectos siguen estando dentro de la clase de los moluscos.
+
+
+- Error de formación en árbol con prepoda
+
+```{r}
+predict(tree_default, Zoo) %>% head ()
+```
+
+```{r}
+pred <- predict(tree_default, Zoo, type="class")
+head(pred)
+```
+
+```{r}
+confusion_table <- with(Zoo, table(type, pred))
+confusion_table
+```
+
+```{r}
+correct <- confusion_table %>% diag() %>% sum()
+correct
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+el resultado muestra la cantidad de predicciones correctas en la diagonal principal
+
+
+```{r}
+error <- confusion_table %>% sum() - correct
+error
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+el resultado muestra la cantidad de predicciones erroneas 
+
+```{r}
+acurracy <- correct / (correct + error)
+acurracy
+```
+
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+Se obtuvo una exactitud del 88% lo cual indica que estamos frente a un resultado bueno
+
+
+```{r}
+accuracy <- function(truth, prediction) {
+      tb1 <- table(truth, prediction)
+      sum(diag(tb1))/sum(tb1)}
+
+accuracy(Zoo %>% pull(type), pred)
+```
+
+Error de entrenamiento del árbol completo
+```{r}
+accuracy(Zoo %>% pull(type), predict(tree_full, Zoo, type="class"))
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+El resultado indica que se obtuvo un 100%, sin embargo esto podria indicar que nos podriamos encontrar en un caso de overfitting.
+
+
+Obtener una tabla de confusión con más estadísticas (usando el signo de intercalación)
+```{r}
+library(lattice)
+library(caret)
+```
+
+```{r}
+confusionMatrix(data = pred, reference = Zoo %>% pull(type))
+```
+
+# 1.2.3. - Hacer predicciones para nuevos datos
+
+EJEMPLO DE PREDICCION 1
+
+- clasificar Un león con alas emplumadas
+```{r}
+my_animal <- tibble(hair = TRUE, feathers = TRUE, eggs = FALSE,
+milk = TRUE, airborne = TRUE, aquatic = FALSE, predator = TRUE,
+toothed = TRUE, backbone = TRUE, breathes = TRUE, venomous = FALSE,
+fins = FALSE, legs = 4, tail = TRUE, domestic = FALSE,
+catsize = FALSE, type = NA)
+```
+
+- Correjir las columnas para que sean factores como en el conjunto de entrenamiento.
+```{r}
+my_animal <- my_animal %>% modify_if(is.logical, factor, levels = c( TRUE, FALSE))
+my_animal
+```
+
+- Hacer una predicción 
+```{r}
+predict(tree_default , my_animal, type = "class")
+```
+
+- El MODELO indica que el leon con alas es un mamifero.
+
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE AGREGA ** </b>
+
+EJEMPLO DE PREDICCION 2:
+
+```{r}
+my_animal2 <- tibble(hair = FALSE, feathers = FALSE, eggs = FALSE,
+milk = FALSE, airborne = FALSE, aquatic = TRUE, predator = TRUE,
+toothed = TRUE, backbone = FALSE, breathes = TRUE, venomous = FALSE,
+fins = FALSE, legs = 10, tail = FALSE, domestic = FALSE,
+catsize = FALSE, type = NA)
+```
+
+- Correjir las columnas para que sean factores como en el conjunto de entrenamiento.
+```{r}
+my_animal2 <- my_animal2 %>% modify_if(is.logical, factor, levels = c( TRUE, FALSE))
+my_animal2
+```
+
+- Hacer una predicción 
+```{r}
+predict(tree_default , my_animal2, type = "class")
+```
+
+- El MODELO indica que el KRAKEN es un molusco
+
+
+# 1.3. - Evaluación del modelo con Caret
+
+- Establecer la semilla del generador de números aleatorios para que los resultados sean reproducibles
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE MODIFICA ** </b>
+
+- seed(2000) a seed(5000)
+```{r}
+set.seed( 5000)
+```
+
+# 1.3.1. - Datos de prueba en espera
+```{r}
+inTrain <- createDataPartition(y = Zoo$type, p = .8, list = FALSE)
+Zoo_train <- Zoo %>% slice(inTrain)
+Zoo_test <- Zoo %>% slice(-inTrain)
+```
+
+#1.3.2. - Aprender un modelo y ajustar hiperparametros en los datos de
+entrenamiento
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE MODIFICA ** </b>
+
+- number = 10 -> 12
+
+```{r}
+fit <- Zoo_train %>%
+  train(type ~ .,
+    data=.,
+    method = "rpart",
+    control = rpart.control(minsplit = 2),
+    trControl = trainControl(method = "cv", number = 12),
+    tuneLength = 5)
+
+fit
+```
+
+Nota: Train ha construido 12 arboles utilizando los folds de entrenamiento para cada valor de cp y los valores informados de exactitud y Kappa son los promedios en los folds de validación.
+
+```{r}
+rpart.plot(fit$finalModel, extra = 2,
+box.palette = list("Gy", "Gn", "Bu", "Bn", "Or", "Rd", "Pu"))
+
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- Respecto a los resultados obtenidos con 10 arboles, con la construccion de 12 arboles se observa una mejora en cuanto a la clasificacion de los reptiles.
+
+
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- varImp: Es un método genérico para calcular la importancia variable de los objetos producidos por entrenamiento y método específicos
+```{r}
+varImp(fit)
+```
+
+* Se observa que la variable 'toothed' tiene un puntaje maximo, asi como por las modificaciones realizadas se observa que las otras variables mejoraron en cuanto a puntaje.
+
+
+
+Importancia de la variable sin divisiones competitivas.
+
+```{r}
+imp <- varImp(fit, compete = FALSE)
+imp
+```
+
+```{r}
+ggplot (imp)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+* El grafico muestra a 'milk' como la variable más relevante y con una gran diferencia, esto puede deberse a diversos factores como son las clases desbalanceadas
+
+
+# .4. - Pruebas: matriz de confusión e intervalo de confianza
+para la precisión
+
+Utilizar el mejor modelo en los datos de prueba
+```{r}
+pred <- predict(fit, newdata = Zoo_test)
+pred
+```
+
+
+La función confusionMatrix() de Caret calcula la exactitud, los intervalos de confianza, kappa y muchas más métricas de evaluación. Se debe usar datos de prueba separados para crear una matriz de confusión basada en el error de generalización.
+
+```{r}
+confusionMatrix(data = pred, ref = Zoo_test$type)
+```
+
+# 1.5. - Comparación de modelo
+
+Comparacion de árboles de decisión con un clasificador de k-vecinos más cercanos (kNN). 
+Creando un esquema de muestreo fijo (10 folds) para comparar los diferentes modelos usando exactamente los mismos folds.
+Se especifica como trControl durante el entrenamiento.
+```{r}
+train_index <- createFolds(Zoo_train$type, k = 10)
+```
+Construir modelos
+```{r}
+rpartFit <- Zoo_train %>% train(type ~ .,
+  data =.,
+  method = "rpart",
+  tuneLength = 10,
+  trControl = trainControl(method = "cv", indexOut = train_index)
+  )
+```
+
+Nota: para kNN le pedimos a train que escale los datos usando preProcess = “scale”. Los lógicos se utilizarán 
+como variables 0-1 en el cálculo de la distancia euclidiana.
+```{r}
+knnFit <- Zoo_train %>% train(type ~ .,
+    data = .,
+    method = "knn",
+    preProcess = "scale",
+      tuneLength = 10,
+      trControl = trainControl(method = "cv", indexOut = train_index)
+      )
+
+```
+
+Compare la exactitud en todos los folds
+```{r}
+resamps <- resamples(list(
+          CART = rpartFit,
+          kNearestNeighbors = knnFit
+          ))
+summary (resamps )
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+El accuracy minimo del algoritmo CART es de un 70%, el medio 87% y el maximo 1,
+respecto del algoritmo KNN supera al los resultados obtenidos por el algoritmo CART,
+esto indica que el modelo con KNN tiene un mejor desempeño.
+
+
+caret proporciona algunas visualizaciones utilizando la red de paquetes. Por ejemplo, un diagrama de caja para comparar la exactitud y la distribución kappa (sobre los 10 folds).
+```{r}
+#library(lattice)
+bwplot(resamps, layout = c(3, 1))
+```
+
+
+Averiguar si un modelo es estadísticamente mejor que el otro (si la diferencia en exactitud no es cero)
+```{r}
+difs <- diff(resamps)
+difs
+```
+
+```{r}
+summary (difs)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- Dado que el valor p para CART frente a KNN es el único valor p menor, SE concluye que hay una diferencia estadísticamente significativa, donde KNN tiene un mejor resultado.
+
+
+# 1.6. - Selección de funciones y preparación de funciones
+
+```{r}
+#install.packages("RWekajars")
+```
+
+```{r}
+library(FSelector)
+```
+
+# 1.6.1. - Puntuación de importancia de característica univariante
+
+
+```{r}
+weights <- Zoo_train %>% chi.squared(type ~ ., data = .) %>%
+      as_tibble(rownames = "feature") %>%
+      arrange(desc(attr_importance))
+
+weights
+```
+
+graficar la importancia en orden descendente (usando reorder para ordenar los niveles de factor usados por ggplot).
+```{r}
+ggplot(weights,
+  aes(x = attr_importance, y = reorder(feature, attr_importance))) +
+  geom_bar(stat = "identity") +
+  xlab("Importance score") + ylab("Feature")
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- La grafica muestra que las 3 primeras caracteristicas son las más representativas, los cuales son: 'milk','feathers' y 'backbone'
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE MODIFICA ** </b>
+
+Obténiendo las 3 mejores caracteristicas
+```{r}
+subset <- cutoff.k(weights %>% column_to_rownames("feature"), 3)
+subset
+```
+
+
+Use solo las mejores 3 caracteristicas para construir un modelo (Fselector proporciona as.simple.formula)
+
+```{r}
+f <- as.simple.formula(subset, "type")
+f
+```
+
+```{r}
+m <- Zoo_train %>% rpart(f, data = .)
+rpart.plot(m, extra = 2, roundint = FALSE)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+Se observa que con las 3 caracteristicas más relevantes se obtuvo los mismos resultados que trabajando con las 5 mejores caracteristicas
+
+
+Tasa de ganancia de informacion basado en la entropia usada en la induccion del arbol de decision
+```{r}
+Zoo_train %>% gain.ratio(type ~ ., data = .) %>%
+  as_tibble(rownames = "feature") %>%
+  arrange(desc(attr_importance))
+```
+
+
+# 1.6.2. - Selección de subconjunto de características
+
+Haciendo uso de cfs(greedy), el cual usa correlación/entropía con la mejor primera búsqueda.
+```{r}
+Zoo_train %>% cfs(type ~ ., data = .)
+```
+
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE MODIFICA ** </b>
+
+Usando el promedio de 3 muestras
+```{r}
+evaluator <- function(subset) {
+  model <- Zoo_train %>% train(as.simple.formula(subset, "type"),
+          data = .,
+          method = "rpart",
+          trControl = trainControl(method = "boot", number = 3),
+          tuneLength = 0)
+  results <- model$resample$Accuracy
+  cat("Trying features:", paste(subset, collapse = " + "), "\n")
+  m <- mean(results)
+  cat("Accuracy:", round(m, 2), "\n\n")
+}
+```
+
+Comenzar con todas las caracteristicas (pero no con la variable de clase type)
+```{r}
+features <- Zoo_train %>% colnames() %>% setdiff("type")
+```
+
+Hay varias estrategias de busqueda (greedy) disponibles. Estos funcionan por un tiempo
+```{r}
+#subset <- best.first.search(features, evaluator)
+#subset
+```
+
+
+# 1.6.3. - Uso de variables ficticias para factores
+
+Las características nominales (factores) a menudo se codifican como una serie de variables ficticias 0-1. Por ejemplo, predecir si un animal es un depredador dado el tipo. Primero usar la codificación original de tipo como un factor con varios valores
+
+```{r}
+tree_predator <- Zoo_train %>% rpart(predator ~ type, data = .)
+rpart.plot(tree_predator, extra = 2, roundint = FALSE)
+```
+Nota: Algunas divisiones usan valores múltiples. La construcción del árbol será extremadamente lenta si un factor tiene muchos niveles (diferentes valores), ya que el árbol tiene que verificar todas las divisiones posibles en dos subconjuntos. Esta situación debe evitarse.
+
+Convertir el tipo en un conjunto de variables ficticias 0-1 usando class2ind
+```{r}
+Zoo_train_dummy <- as_tibble(class2ind(Zoo_train$type)) %>% mutate_all(as.factor) %>%
+  add_column(predator = Zoo_train$predator)
+Zoo_train_dummy
+```
+
+```{r}
+tree_predator <- Zoo_train_dummy %>% rpart(predator ~ ., data = .,
+control = rpart.control(minsplit = 2, cp = 0.01))
+rpart.plot(tree_predator, roundint = FALSE)
+```
+
+
+El uso de intercalación en la codificación del factor original traduce automáticamente los factores (aqui tipo) en O-
+1 variables ficticias (por ejemplo, tipoinsecto = 0). La razón es que algunos modelos no pueden usar factores
+directamente y caret intenta trabajar consistentemente con todos ellos.
+
+```{r}
+fit <- Zoo_train %>% train(predator ~ type, data = ., method = "rpart",
+control = rpart.control(minsplit = 2),
+tuneGrid = data.frame(cp = 0.01))
+fit
+```
+
+```{r}
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+Nota: Para usar un valor fijo para el parámetro de ajuste cp, tenemos que crear una cuadrícula de ajuste que solo contenga ese valor
+
+# 1.7. - Desequilibrio de Clase
+```{r}
+library(rpart)
+library(rpart.plot)
+data(Zoo, package="mlbench")
+```
+
+Distribución de clase
+```{r}
+ggplot(Zoo, aes(y = type)) + geom_bar()
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+Se observa desequilibrio entre las diferentes clases, donde este desequilibrio podria repercutir en resultados erroneos o en un underfitting
+
+
+ 
+convertir la variable de clase en un factor (una variable nominal)
+
+```{r}
+Zoo_reptile <- Zoo %>% mutate(
+  type = factor(Zoo$type == "reptile", levels = c(FALSE, TRUE),
+    labels = c("nonreptile", "reptile")))
+```
+
+```{r}
+summary(Zoo_reptile)
+```
+
+verificando si tenemos desequilibrio de clases
+
+```{r}
+ggplot(Zoo_reptile, aes(y = type)) + geom_bar()
+```
+
+Crear datos de prueba y entrenamiento. 
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+Usar una posible solucion de realizar una división de 50/50 para poder disminuir o mitigar el desequilibrio de clases
+
+```{r}
+set.seed(1234)
+inTrain <- createDataPartition(y = Zoo_reptile$type, p = .5, list = FALSE)
+training_reptile <- Zoo_reptile %>% slice(inTrain)
+testing_reptile <- Zoo_reptile %>% slice(-inTrain)
+```
+
+
+# 1.7.1. - Opción 1: use los datos tal como están y espere lo mejor
+```{r}
+fit <- training_reptile %>% train(type ~.,
+data = .,
+method = "rpart",
+trControl = trainControl(method = "cv"))
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+* Se muestra una alerta que indica que hay presencia de valores faltantes, esto podria ser un factor el cual influencia para que se produzca el desequilibrio entre las clases
+
+```{r}
+fit
+```
+
+```{r}
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+el modelo predice que de 51 observaciones, 48 no son reptiles  
+
+
+Verificar el error en el conjunto de prueba.
+
+```{r}
+confusionMatrix(data = predict(fit, testing_reptile),
+ref = testing_reptile$type, positive = "reptile")
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+Segun los resultados, el modelo es capaz de predecir un NO reptil, sin embargo si se le da a predecir un reptil no será capaz de clasificarlo.
+
+# 1.7.2. - Opción 2: equilibrar datos con remuestreo
+
+- Haciendo uso de muestero estratificado con reemplazo
+```{r}
+library(sampling)
+```
+
+```{r}
+set.seed(1000) # para que sea reproducible
+id <- strata(training_reptile, stratanames = "type", size = c(50, 50), method = "srswr")
+training_reptile_balanced <- training_reptile %>% slice(id$ID_unit)
+table(training_reptile_balanced$type)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE AGREGA ** </b>
+  
+- visualizacion de la tabla con los datos generados
+
+```{r}
+training_reptile_balanced
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE AGREGA ** </b>
+
+- resumen
+
+```{r}
+summary(training_reptile_balanced)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE AGREGA ** </b>
+
+- grafico
+
+```{r}
+ggplot(training_reptile_balanced, aes(y=type))+ geom_bar()
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- Se observa que la cantidad de observaciones por clase estan balanceadas 50/50
+
+<b style = 'color:Coral; font-size: 20px;'> ** SE SUGIERE Y MODIFICA ** </b>
+
+- Se sugiere incrementar el min split de 5 -> 70
+
+```{r}
+fit <- training_reptile_balanced %>% train(type ~ .,
+data = .,
+method = "rpart",
+trControl = trainControl(method = "cv"),
+control = rpart.control(minsplit = 70))
+
+fit
+```
+
+```{r}
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- Se observa segun la grafica y las modificaciones realizadas, que ahora de 51 observaciones 33 no son reptiles, y de 49 observaciones 32 son reptiles
+
+Compruebe los datos de prueba desequilibrados.
+```{r}
+confusionMatrix(data = predict(fit, testing_reptile),
+ref = testing_reptile$type, positive = "reptile")
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- Se observa que la exactitud a subio de 42% a 76% y sin embargo la sensibilidad bajo de 1 a 0.5,
+sin embargo se observa que la especificidad ha incrementado. Esto da a entender que si la especificidad incrementa la sensibilidad disminuye y viceversa
+
+
+Muestrear más reptiles para aumentar la sensibilidad
+```{r}
+id <- strata(training_reptile, stratanames = "type", size = c(50, 100), method = "srswr")
+training_reptile_balanced <- training_reptile %>% slice(id$ID_unit)
+table(training_reptile_balanced$type)
+```
+
+```{r}
+fit <- training_reptile_balanced %>% train(type ~ .,
+  data = .,
+  method = "rpart",
+  trControl = trainControl(method = "cv"),
+  control = rpart.control(minsplit = 5))
+
+confusionMatrix(data = predict(fit, testing_reptile),
+  ref = testing_reptile$type, positive = "reptile")
+```
+
+
+# 1.7.3. - Opción 3: Construya un árbol más grande y use probabilidades
+pronosticadas
+
+
+```{r}
+fit <- training_reptile %>% train(type ~ .,
+  data = .,
+  method = "rpart",
+  tuneLength = 10,
+  trControl = trainControl(method = "cv",
+    classProbs = TRUE, ## Necesario para predecir con type = "prob"
+    summaryFunction=twoClassSummary), 
+  metric = "ROC",
+  control = rpart.control(minsplit = 3))
+```
+
+```{r}
+fit
+```
+
+```{r}
+rpart.plot(fit$finalModel, extra =2 )
+```
+
+```{r}
+confusionMatrix(data = predict(fit, testing_reptile),
+ref = testing_reptile$type, positive = "reptile")
+```
+
+Nota: La exactitud es alta, pero está cerca o por debajo de la tasa sin información
+
+# 1.7.3.1. - Crear un clasificador sesgado
+
+```{r}
+prob <- predict(fit,testing_reptile,type = "prob")
+tail(prob)
+```
+
+```{r}
+pred <- as.factor(ifelse(prob[, "reptile"]>=0.01, "reptile", "nonreptile"))
+confusionMatrix(data = pred,
+ref = testing_reptile$type, positive = "reptile")
+```
+
+
+Nota esa precisión disminuye y está por debajo de la tasa de no información. Sin embargo, ambas medidas se basan en la idea de que todos los errores tienen el mismo costo. Lo importante es que ahora podemos encontrar
+más reptiles.
+
+# 1.7.3.2. - Trazar la curva ROC
+```{r}
+library("pROC")
+```
+
+```{r}
+r <- roc(testing_reptile$type == "reptile", prob[,"reptile"])
+```
+
+```{r}
+r
+```
+
+```{r}
+ggroc(r) + geom_abline(intercept = 1, slope = 1, color = "darkgrey")
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+- En el grafico se observa que cuando la especificidad disminuye la sensibilidad incrementa y viceversa.
+
+
+# 1.7.4. - Opción 4: use un clasificador sensible al costo
+
+
+```{r}
+cost <- matrix(c(
+    0, 1,
+    100, 0
+  ), byrow = TRUE, nrow = 2)
+cost
+```
+
+```{r}
+fit <- training_reptile %>% train(type ~.,
+  data = .,
+  method = "rpart",
+  parms = list(loss = cost),
+  trControl = trainControl(method = "cv"))
+```
+
+la advertencia “Faltaron valores en las medidas de rendimiento remuestreadas” significa que algunos folds no contenían ningún reptil (debido al desequilibrio de clase), lo que conlleva  que no se pueden calcular las medidas de rendimiento.
+
+```{r}
+fit
+```
+
+```{r}
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+
+```{r}
+confusionMatrix(data = predict(fit, testing_reptile),
+ref = testing_reptile$type, positive = "reptile")
+```
+
+<b style = 'color:Coral; font-size: 20px;'> ** COMENTARIO ** </b>
+
+* Debido a que se esta considerando el costo de clasificacion erronea se observa mejoras en los resultados, una exactitud buena, una sensibilidad alta y especificidad buena.
+
+
+
+
+>>>>>>> 9a39e039a9a9acf204fa4367a50cc4f548f28191
