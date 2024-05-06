@@ -1,0 +1,1 @@
+![Dashboard-FuturoTecno](dashboard-view.png)
