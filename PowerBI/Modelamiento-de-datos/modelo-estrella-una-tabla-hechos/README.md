@@ -1,5 +1,5 @@
 
-# Modelo estrella de datos en Power BI con una tabla de hechos
+# Modelo de datos estrella en Power BI con una tabla de hechos
 
 El modelo estrella es una estructura de datos que organiza los datos en dimensiones y medidas para facilitar la visualización y el análisis de los resultados.
 
